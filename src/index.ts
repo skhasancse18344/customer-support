@@ -5,6 +5,8 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/auth.routes';
 import conversationRoutes from './routes/conversation.routes';
 import analyticsRoutes from './routes/analytics.routes';
+import userRoutes from './routes/user.routes';
+import tenantRoutes from './routes/tenant.routes';
 import { startEmailWorker } from './jobs/email.job';
 
 dotenv.config();
@@ -23,6 +25,8 @@ app.get('/health', (_req: Request, res: Response) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/conversations', conversationRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/tenants', tenantRoutes);
 
 app.use((_req: Request, res: Response) => {
   res.status(404).json({ error: 'Route not found' });
