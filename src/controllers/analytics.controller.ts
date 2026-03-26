@@ -4,6 +4,14 @@ import prisma from '../lib/prisma';
 import redis from '../lib/redis';
 
 const CACHE_TTL = 3600;
+const CACHE_PREFIX = 'analytics:top:';
+
+export const invalidateAnalyticsCache = async (tenantId: string): Promise<void> => {
+  const keys = await redis.keys(`${CACHE_PREFIX}*`);
+  if (keys.length > 0) {
+    await redis.del(...keys);
+  }
+};
 
 export const getTopActiveConversations = async (
   req: AuthRequest,
@@ -18,7 +26,7 @@ export const getTopActiveConversations = async (
       return;
     }
 
-    const cacheKey = `analytics:top:${tenantId || 'all'}`;
+    const cacheKey = `${CACHE_PREFIX}${tenantId || 'all'}`;
 
     const cached = await redis.get(cacheKey);
     if (cached) {

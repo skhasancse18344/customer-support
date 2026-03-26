@@ -3,10 +3,29 @@ import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
+const BATCH_SIZE = 1000;
+const TOTAL_CONVERSATIONS = 200_000;
+const TOTAL_MESSAGES = 1_000_000;
+
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+
+async function batchInsert<T>(
+  items: T[],
+  insertFn: (batch: T[]) => Promise<any>,
+  label: string
+) {
+  for (let i = 0; i < items.length; i += BATCH_SIZE) {
+    const batch = items.slice(i, i + BATCH_SIZE);
+    await insertFn(batch);
+    if ((i + BATCH_SIZE) % 10_000 === 0 || i + BATCH_SIZE >= items.length) {
+      console.log(`  ${label}: ${Math.min(i + BATCH_SIZE, items.length)}/${items.length}`);
+    }
+  }
+}
 
 async function seed() {
   console.log('Seeding database...');
+  const start = Date.now();
 
   await prisma.message.deleteMany();
   await prisma.conversation.deleteMany();
@@ -15,11 +34,13 @@ async function seed() {
 
   const hash = await bcrypt.hash('password123', 10);
 
-  // Create 3 tenants
+  // Create 10 tenants
+  const tenantNames = [
+    'Acme Corp', 'Globex Inc', 'Initech', 'Umbrella Co', 'Stark Industries',
+    'Wayne Enterprises', 'Oscorp', 'Cyberdyne', 'Soylent Corp', 'Aperture Science',
+  ];
   const tenants = await Promise.all(
-    ['Acme Corp', 'Globex Inc', 'Initech'].map((name) =>
-      prisma.tenant.create({ data: { name } })
-    )
+    tenantNames.map((name) => prisma.tenant.create({ data: { name } }))
   );
 
   // Create super admin
@@ -50,14 +71,23 @@ async function seed() {
     }
   }
 
-  // Create 100 conversations
-  const statuses: ConversationStatus[] = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'];
-  const subjects = ['Login issue', 'Payment problem', 'Feature request', 'Bug report', 'Billing inquiry'];
+  console.log(`Users created: ${allUsers.length + 1}`);
 
-  const conversations = [];
+  // Build 200,000 conversations
+  console.log(`Building ${TOTAL_CONVERSATIONS} conversations...`);
+  const statuses: ConversationStatus[] = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'];
+  const subjects = [
+    'Login issue', 'Payment problem', 'Feature request', 'Bug report',
+    'Billing inquiry', 'Account locked', 'Slow performance', 'Data export',
+    'Integration help', 'Password reset',
+  ];
+
+  const perTenant = Math.ceil(TOTAL_CONVERSATIONS / tenants.length);
+  const conversations: any[] = [];
+
   for (const tenant of tenants) {
     const agents = allUsers.filter((u) => u.tenantId === tenant.id && u.role === 'AGENT');
-    for (let i = 0; i < 33; i++) {
+    for (let i = 0; i < perTenant && conversations.length < TOTAL_CONVERSATIONS; i++) {
       const status = pick(statuses);
       conversations.push({
         subject: pick(subjects),
@@ -69,23 +99,58 @@ async function seed() {
       });
     }
   }
-  await prisma.conversation.createMany({ data: conversations });
 
-  // Create ~500 messages
-  const created = await prisma.conversation.findMany({ select: { id: true, tenantId: true } });
-  const texts = ['I need help.', 'Looking into this.', 'Thanks!', 'Any update?', 'Resolved.'];
-  const messages = [];
-  for (const conv of created) {
+  await batchInsert(
+    conversations,
+    (batch) => prisma.conversation.createMany({ data: batch }),
+    'Conversations'
+  );
+
+  // Fetch conversation IDs for message generation
+  console.log('Fetching conversation IDs...');
+  const convRows = await prisma.conversation.findMany({
+    select: { id: true, tenantId: true },
+  });
+
+  // Build 1,000,000 messages
+  console.log(`Building ${TOTAL_MESSAGES} messages...`);
+  const texts = [
+    'I need help with this issue.',
+    'Looking into this now.',
+    'Thanks for reaching out!',
+    'Any update on this?',
+    'This has been resolved.',
+    'Can you provide more details?',
+    'I have attached a screenshot.',
+    'Let me escalate this.',
+    'Please try clearing your cache.',
+    'Is this still an issue?',
+  ];
+
+  const msgsPerConv = Math.ceil(TOTAL_MESSAGES / convRows.length);
+  const messages: any[] = [];
+
+  for (const conv of convRows) {
     const users = allUsers.filter((u) => u.tenantId === conv.tenantId);
     if (!users.length) continue;
-    const count = Math.floor(Math.random() * 5) + 1;
-    for (let i = 0; i < count; i++) {
-      messages.push({ content: pick(texts), conversationId: conv.id, senderId: pick(users).id });
+    const count = Math.min(msgsPerConv, Math.floor(Math.random() * 3) + msgsPerConv - 1);
+    for (let i = 0; i < count && messages.length < TOTAL_MESSAGES; i++) {
+      messages.push({
+        content: pick(texts),
+        conversationId: conv.id,
+        senderId: pick(users).id,
+      });
     }
   }
-  await prisma.message.createMany({ data: messages });
 
-  console.log(`Done: ${tenants.length} tenants, ${allUsers.length + 1} users, ${conversations.length} conversations, ${messages.length} messages`);
+  await batchInsert(
+    messages,
+    (batch) => prisma.message.createMany({ data: batch }),
+    'Messages'
+  );
+
+  const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+  console.log(`\nDone in ${elapsed}s: ${tenants.length} tenants, ${allUsers.length + 1} users, ${conversations.length} conversations, ${messages.length} messages`);
   console.log('Credentials: superadmin@support-saas.com / password123');
   console.log('             admin@acmecorp.com / password123');
   console.log('             agent1@acmecorp.com / password123');

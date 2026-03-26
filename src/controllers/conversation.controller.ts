@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import prisma from '../lib/prisma';
 import { sendResolutionEmail } from '../jobs/email.job';
+import { invalidateAnalyticsCache } from './analytics.controller';
 
 export const createConversation = async (
   req: AuthRequest,
@@ -39,6 +40,8 @@ export const createConversation = async (
         },
       },
     });
+
+    await invalidateAnalyticsCache(tenantId);
 
     res.status(201).json({ conversation });
   } catch (error) {
@@ -247,6 +250,8 @@ export const resolveConversation = async (
       subject: conversation.subject,
       agentEmail: conversation.assignedAgent?.email || 'unassigned',
     });
+
+    await invalidateAnalyticsCache(tenantId);
 
     res.json({ conversation });
   } catch (error) {
