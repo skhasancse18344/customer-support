@@ -12,67 +12,31 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Security headers with Helmet
-app.use(
-  helmet({
-    hsts: {
-      maxAge: 31536000,
-      includeSubDomains: true,
-      preload: true,
-    },
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        scriptSrc: ["'self'"],
-        imgSrc: ["'self'", 'data:', 'https:'],
-      },
-    },
-    xFrameOptions: { action: 'deny' },
-  })
-);
-
-// CORS
-app.use(
-  cors({
-    origin: process.env.CORS_ORIGIN || '*',
-    credentials: true,
-  })
-);
-
-// Body parser
+app.use(helmet());
+app.use(cors());
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
-// Health check
-app.get('/health', (req: Request, res: Response) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get('/health', (_req: Request, res: Response) => {
+  res.json({ status: 'ok' });
 });
 
-// Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/conversations', conversationRoutes);
 app.use('/api/analytics', analyticsRoutes);
 
-// 404 handler
-app.use((req: Request, res: Response) => {
+app.use((_req: Request, res: Response) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
-// Error handler
-app.use((err: Error, req: Request, res: Response, next: any) => {
-  console.error('Error:', err);
+app.use((err: Error, _req: Request, res: Response, _next: any) => {
+  console.error(err);
   res.status(500).json({ error: 'Internal server error' });
 });
 
-// Start background workers
 startEmailWorker();
 
-// Start server
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔗 Health check: http://localhost:${PORT}/health`);
+  console.log(`Server running on port ${PORT}`);
 });
 
 export default app;

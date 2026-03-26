@@ -8,15 +8,9 @@
     "dev": "nodemon --exec ts-node src/index.ts",
     "start": "node dist/index.js",
     "postinstall": "prisma generate",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:migrate:deploy": "prisma migrate deploy",
-    "prisma:studio": "prisma studio",
     "seed": "ts-node prisma/seed.ts",
     "docker:up": "docker-compose up -d",
-    "docker:down": "docker-compose down",
-    "docker:logs": "docker-compose logs -f",
-    "docker:rebuild": "docker-compose down && docker-compose build && docker-compose up -d"
+    "docker:down": "docker-compose down"
   },
   "keywords": [],
   "author": "",

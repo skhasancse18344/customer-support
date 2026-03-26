@@ -48,9 +48,7 @@ model User {
   assignedConversations Conversation[] @relation("AssignedAgent")
   messages              Message[]
 
-  @@index([email])
   @@index([tenantId])
-  @@index([role])
   @@map("users")
 }
 
@@ -70,10 +68,7 @@ model Conversation {
   messages Message[]
 
   @@index([tenantId, status])
-  @@index([tenantId, createdAt])
-  @@index([tenantId, updatedAt])
   @@index([assignedAgentId])
-  @@index([status])
   @@map("conversations")
 }
 
@@ -87,7 +82,5 @@ model Message {
   createdAt      DateTime     @default(now())
 
   @@index([conversationId])
-  @@index([senderId])
-  @@index([createdAt])
   @@map("messages")
 }
